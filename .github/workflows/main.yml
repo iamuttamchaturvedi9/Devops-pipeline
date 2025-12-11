@@ -1,0 +1,40 @@
+name: Build and Push to ACR
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  REGISTRY: shoppingacr-axffdchcbfhxh5dr.azurecr.io
+  IMAGE_REPOSITORY: uttamchaturvedimehmataks
+  DOCKERFILE_PATH: Shopping/Shopping.API/Dockerfile
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Docker login to ACR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ env.DOCKERFILE_PATH }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_REPOSITORY }}:${{ github.run_number }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_REPOSITORY }}:latest
