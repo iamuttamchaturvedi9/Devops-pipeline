@@ -1,17 +1,16 @@
-name: Build and Push to ACR
+name: Build and Push to ACR1
 
 on:
   push:
     branches: [ main ]
 
-env:
-  REGISTRY: shoppingacr-axffdchcbfhxh5dr.azurecr.io
-  IMAGE_REPOSITORY: uttamchaturvedimehmataks
-  DOCKERFILE_PATH: Shopping/Shopping.API/Dockerfile
-
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    env:
+      REGISTRY: shoppingacr-axffdchcbfhxh5dr.azurecr.io
+      IMAGE_REPOSITORY: uttamchaturvedimehmataks
+      DOCKERFILE_PATH: Shopping/Shopping.API/Dockerfile
 
     steps:
       - name: Checkout
