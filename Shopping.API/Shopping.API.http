@@ -1,0 +1,6 @@
+@Shopping.API_HostAddress = http://localhost:5193
+
+GET {{Shopping.API_HostAddress}}/Product/
+Accept: application/json
+
+###
