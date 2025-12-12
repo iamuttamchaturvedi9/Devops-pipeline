@@ -1,39 +1,37 @@
-name: Build and Push to ACR1
+trigger:
+- none
 
-on:
-  push:
-    branches: [ main ]
+pool:
+  vmImage: ubuntu-latest
 
-jobs:
-  build-and-push:
-    runs-on: ubuntu-latest
-    env:
-      REGISTRY: shoppingacr-axffdchcbfhxh5dr.azurecr.io
-      IMAGE_REPOSITORY: uttamchaturvedimehmataks
-      DOCKERFILE_PATH: Shopping/Shopping.API/Dockerfile
+name: $(Year:yy).$(DayOfYear).$(Rev:r)
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+steps:
+  - checkout: self
+    submodules: recursive    
 
-      - name: Azure login
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+# 🔹 Build the Docker Image ONCE
+  - task: Docker@2
 
-      - name: Docker login to ACR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.ACR_USERNAME }}
-          password: ${{ secrets.ACR_PASSWORD }}
+    displayName: Build new Docker Image $(Build.BuildNumber) | latest
+    inputs:
+      containerRegistry: "shoppingacr"
+      repository: "shopping.microservce"
+      command: "build"
+      Dockerfile: "**/Dockerfile"
+      buildContext: "."
+      tags: |
+        $(Build.BuildNumber)
+        latest
 
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ${{ env.DOCKERFILE_PATH }}
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_REPOSITORY }}:${{ github.run_number }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_REPOSITORY }}:latest
+# 🔹 Push the Image to ACR
+  - task: Docker@2
+    displayName: Push Docker Image $(Build.BuildNumber) | latest
+    inputs:
+      containerRegistry: "shoppingacr"
+      repository: "shopping.microservce"
+      command: "push"
+      Dockerfile: "**/Dockerfile"
+      tags: |
+        $(Build.BuildNumber)
+        latest
