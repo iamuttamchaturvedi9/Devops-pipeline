@@ -16,7 +16,7 @@ steps:
     displayName: Build new Docker Image $(Build.BuildNumber) | latest
     inputs:
       containerRegistry: "shoppingacr"
-      repository: "shopping.microservce"
+      repository: "shopping.microservice"
       command: "build"
       Dockerfile: "**/Dockerfile"
       buildContext: "."
@@ -29,7 +29,7 @@ steps:
     displayName: Push Docker Image $(Build.BuildNumber) | latest
     inputs:
       containerRegistry: "shoppingacr"
-      repository: "shopping.microservce"
+      repository: "shopping.microservice"
       command: "push"
       Dockerfile: "**/Dockerfile"
       tags: |
