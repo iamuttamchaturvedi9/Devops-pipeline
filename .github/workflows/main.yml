@@ -18,6 +18,7 @@ steps:
       repository: "shopping.microservice"
       command: "buildAndPush"
       Dockerfile: "**/Dockerfile"
+      buildContext: "."
       tags: |
         $(Build.BuildNumber)
         latest
