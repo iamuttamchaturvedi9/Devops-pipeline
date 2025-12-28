@@ -29,29 +29,42 @@ stages:
         version: $(dotnetVersion)
 
     - task: DotNetCoreCLI@2
-      displayName: 'Restore packages'
+      displayName: 'Restore solution'
       inputs:
         command: 'restore'
-        projects: '$(projectPath)'
+        projects: '**/*.sln'
 
     - task: DotNetCoreCLI@2
-      displayName: 'Build project'
-      inputs:
-        command: 'build'
-        projects: '$(projectPath)'
-        arguments: '--configuration Release --no-restore'
-
-    - task: DotNetCoreCLI@2
-      displayName: 'Publish project'
+      displayName: 'Publish Shopping.API'
       inputs:
         command: 'publish'
         projects: '$(projectPath)'
-        arguments: '--configuration Release --output $(Build.ArtifactStagingDirectory) --no-build'
+        arguments: '--configuration Release --output $(Build.ArtifactStagingDirectory) --no-restore'
+
+    - task: Bash@3
+      displayName: 'List published files'
+      inputs:
+        targetType: 'inline'
+        script: |
+          echo "Files in artifact staging directory:"
+          ls -la $(Build.ArtifactStagingDirectory)
+          echo ""
+          echo "Looking for Shopping.API.dll:"
+          find $(Build.ArtifactStagingDirectory) -name "Shopping.API.dll" -type f
+
+    - task: ArchiveFiles@2
+      displayName: 'Create deployment package'
+      inputs:
+        rootFolderOrFile: '$(Build.ArtifactStagingDirectory)'
+        includeRootFolder: false
+        archiveType: 'zip'
+        archiveFile: '$(Build.ArtifactStagingDirectory)/deployment.zip'
+        replaceExistingArchive: true
 
     - task: PublishBuildArtifacts@1
       displayName: 'Publish artifacts'
       inputs:
-        pathToPublish: '$(Build.ArtifactStagingDirectory)'
+        pathToPublish: '$(Build.ArtifactStagingDirectory)/deployment.zip'
         artifactName: 'drop'
 
 - stage: Deploy
@@ -66,11 +79,47 @@ stages:
       runOnce:
         deploy:
           steps:
+          - task: AzureCLI@2
+            displayName: 'Configure App Service Runtime Stack'
+            inputs:
+              azureSubscription: '$(azureSubscription)'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "Configuring App Service runtime stack..."
+                RG=$(az webapp show --name $(appName) --query resourceGroup -o tsv)
+                echo "Resource Group: $RG"
+                az webapp config set --name $(appName) --resource-group $RG --linux-fx-version "DOTNETCORE|8.0"
+                az webapp config set --name $(appName) --resource-group $RG --startup-file "dotnet Shopping.API.dll"
+                echo "Runtime stack configured successfully"
+
+          - task: Bash@3
+            displayName: 'Extract and verify deployment package'
+            inputs:
+              targetType: 'inline'
+              script: |
+                echo "Contents of drop folder:"
+                ls -la $(Pipeline.Workspace)/drop
+                echo ""
+                if [ -f "$(Pipeline.Workspace)/drop/deployment.zip" ]; then
+                  echo "Found deployment.zip, extracting..."
+                  unzip -q $(Pipeline.Workspace)/drop/deployment.zip -d $(Pipeline.Workspace)/drop/extracted
+                  echo "Extracted files:"
+                  ls -la $(Pipeline.Workspace)/drop/extracted
+                  echo ""
+                  echo "Looking for Shopping.API.dll:"
+                  find $(Pipeline.Workspace)/drop/extracted -name "Shopping.API.dll" -type f || echo "Shopping.API.dll not found!"
+                else
+                  echo "No deployment.zip found, checking for direct files..."
+                  find $(Pipeline.Workspace)/drop -name "Shopping.API.dll" -type f || echo "Shopping.API.dll not found!"
+                fi
+
           - task: AzureWebApp@1
             displayName: 'Deploy to Azure App Service'
             inputs:
               azureSubscription: '$(azureSubscription)'
               appName: '$(appName)'
-              package: '$(Pipeline.Workspace)/drop'
+              package: '$(Pipeline.Workspace)/drop/deployment.zip'
               deploymentMethod: 'auto'
+              startUpCommand: 'dotnet Shopping.API.dll'
 

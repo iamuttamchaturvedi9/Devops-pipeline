@@ -1,4 +1,3 @@
-
 using Shopping.API.Data;
 
 namespace Shopping.API
@@ -20,14 +19,17 @@ namespace Shopping.API
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
-            if (app.Environment.IsDevelopment())
+            // Enable Swagger in all environments for API documentation
+            app.UseSwagger();
+            app.UseSwaggerUI(c =>
             {
-                app.UseSwagger();
-                app.UseSwaggerUI();
-            }
+                c.SwaggerEndpoint("/swagger/v1/swagger.json", "Shopping API V1");
+            });
 
             app.UseAuthorization();
 
+            // Add a simple root endpoint to show API is running
+            app.MapGet("/", () => "Shopping API is running! Visit /swagger for API documentation or /api/Product for products.");
 
             app.MapControllers();
 
