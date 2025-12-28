@@ -1,24 +1,42 @@
-trigger:
-- none
+name: Build and Deploy to Azure App Service
 
-pool:
-  vmImage: ubuntu-latest
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
 
-name: $(Year:yy).$(DayOfYear).$(Rev:r)
+env:
+  AZURE_WEBAPP_NAME: shopping-api    # Set this to your App Service name
+  DOTNET_VERSION: '8.0.x'
+  PROJECT_PATH: 'Shopping.API/Shopping.API.csproj'
 
-steps:
-  - checkout: self
-    submodules: recursive    
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-# 🔹 Build and Push the Image to ACR
-  - task: Docker@2
-    displayName: Build and Push Docker Image $(Build.BuildNumber) | latest
-    inputs:
-      containerRegistry: "shoppingacr"
-      repository: "shopping.microservice"
-      command: "buildAndPush"
-      Dockerfile: "**/Dockerfile"
-      buildContext: "."
-      tags: |
-        $(Build.BuildNumber)
-        latest
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.PROJECT_PATH }}
+
+    - name: Build
+      run: dotnet build ${{ env.PROJECT_PATH }} --configuration Release --no-restore
+
+    - name: Publish
+      run: dotnet publish ${{ env.PROJECT_PATH }} --configuration Release --no-build --output ./publish
+
+    - name: Deploy to Azure Web App
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        package: ./publish
