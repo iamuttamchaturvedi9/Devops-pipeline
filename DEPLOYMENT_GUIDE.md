@@ -1,12 +1,13 @@
 # Deployment Guide - Azure App Service
 
-This guide walks you through deploying your Shopping API to Azure App Service using GitHub Actions.
+This guide walks you through deploying your Shopping API to Azure App Service using **Azure DevOps Pipelines**.
 
 ## Prerequisites
 
 - Azure account with an active subscription
+- Azure DevOps organization and project
+- Code stored in Azure Repos (Azure DevOps Git)
 - Azure CLI installed (optional, but recommended)
-- GitHub repository with your code
 
 ## Step-by-Step Instructions
 
@@ -64,76 +65,76 @@ az webapp create --resource-group $resourceGroup --plan $appServicePlan --name $
 4. **Open the file** in a text editor (like Notepad)
 5. **Copy the entire contents** - you'll need this for the next step
 
-### Step 3: Add GitHub Secret
+### Step 3: Create Azure Service Connection in Azure DevOps
 
-**⚠️ IMPORTANT: You need to be on the REPOSITORY settings, not your personal account settings!**
+**This connects Azure DevOps to your Azure subscription for deployment.**
 
 **Detailed Steps:**
 
-1. **First, navigate to your repository:**
-   - Go to `https://github.com/YOUR_USERNAME/Shopping` (replace YOUR_USERNAME)
-   - Or search for your repository in GitHub
+1. **Go to Azure DevOps:**
+   - Navigate to: `https://dev.azure.com/YOUR_ORG/YOUR_PROJECT`
+   - Replace `YOUR_ORG` with your organization name
+   - Replace `YOUR_PROJECT` with your project name
 
-2. **On the repository page**, look at the **top menu bar** (you should see tabs like: Code, Issues, Pull requests, Actions, Projects, Wiki, Security, Insights, Settings)
-   - Click on **"Settings"** tab (it's usually the last tab on the right)
+2. **Open Project Settings:**
+   - Click the **gear icon** ⚙️ (Settings) in the bottom left corner
+   - Or click **"Project settings"** from the left sidebar
 
-3. **In the repository Settings page**, look at the **left sidebar** - you should see different options like:
-   - General
-   - Access
-   - Secrets and variables ← **This is what you need!**
-   - Actions
-   - Environments
-   - etc.
+3. **Navigate to Service Connections:**
+   - In the left sidebar, under **"Pipelines"**, click **"Service connections"**
 
-4. Click on **"Secrets and variables"** in the left sidebar
+4. **Create New Service Connection:**
+   - Click **"New service connection"** button (top right)
+   - Select **"Azure Resource Manager"**
+   - Click **"Next"**
 
-5. Click on **"Actions"** (under "Secrets and variables")
+5. **Choose Authentication Method:**
+   - Select **"Workload Identity federation (recommended)"** or **"Service principal (automatic)"**
+   - Click **"Next"**
 
-6. You should see a button **"New repository secret"** - click it
+6. **Configure Connection:**
+   - **Scope level**: Select **"Subscription"**
+   - **Subscription**: Select your Azure subscription
+   - **Resource group**: Leave empty or select a specific resource group
+   - **Service connection name**: Enter a name (e.g., `Azure-Shopping-Connection`)
+   - **Security**: Check **"Grant access permission to all pipelines"** (or configure specific pipelines)
+   - Click **"Save"**
 
-7. Fill in:
-   - **Name**: `AZURE_WEBAPP_PUBLISH_PROFILE`
-   - **Secret**: Paste the entire contents of the `.PublishSettings` file
+7. **Note the Service Connection Name:**
+   - Remember the name you gave it (e.g., `Azure-Shopping-Connection`)
+   - You'll need to update this in the pipeline file
 
-8. Click **"Add secret"**
+**Alternative: Using Publish Profile (Simpler but less secure)**
 
-**Visual Guide:**
+If you prefer using publish profile:
+1. Download publish profile from Azure Portal (Step 2)
+2. In Azure DevOps → Project Settings → Service Connections
+3. Create new → **"Azure App Service deployment"**
+4. Select **"Publish Profile"**
+5. Upload the `.PublishSettings` file
+6. Name it (e.g., `Shopping-AppService-Profile`)
+
+### Step 4: Update Pipeline File
+
+1. **Open the pipeline file** (`azure-pipelines.yml`) in your repository
+
+2. **Update these variables:**
+   - `azureSubscription`: Change `'YOUR_SERVICE_CONNECTION_NAME'` to the service connection name you created (e.g., `'Azure-Shopping-Connection'`)
+   - `appName`: Change `'shopping-api'` to match your App Service name if different
+
+3. **Commit and push the changes:**
+   ```powershell
+   git add azure-pipelines.yml
+   git commit -m "Configure Azure Pipeline"
+   git push
+   ```
+
+**Example after update:**
+```yaml
+variables:
+  azureSubscription: 'Azure-Shopping-Connection'  # Your service connection name
+  appName: 'shopping-api'  # Your App Service name
 ```
-1. Go to: github.com/YOUR_USERNAME/Shopping
-   ↓
-2. Click "Settings" tab (top menu of repository)
-   ↓
-3. Left sidebar shows repository settings
-   ↓
-4. Click "Secrets and variables"
-   ↓
-5. Click "Actions"
-   ↓
-6. Click "New repository secret"
-```
-
-**Direct URL Method (Easiest):**
-
-Replace `YOUR_USERNAME` with your GitHub username:
-```
-https://github.com/YOUR_USERNAME/Shopping/settings/secrets/actions
-```
-
-**Common Mistake:**
-- ❌ **Wrong**: Going to your profile → Settings (personal account settings)
-- ✅ **Correct**: Going to your repository → Settings tab (repository settings)
-
-**If you still can't find it:**
-- Make sure you're on the **repository page**, not your profile page
-- You need **admin/owner** permissions on the repository
-- If it's not your repo, ask the owner to add you as a collaborator with admin rights
-
-### Step 4: Update Workflow File (if needed)
-
-Check the workflow file (`.github/workflows/main.yml`) and ensure:
-- `AZURE_WEBAPP_NAME` matches your App Service name (currently set to `shopping-api`)
-
-If your App Service name is different, update line 11 in the workflow file.
 
 ### Step 5: Configure App Settings in Azure
 
@@ -159,36 +160,57 @@ Since your app uses MongoDB, you need to configure the connection string:
 > **Note**: If you're using MongoDB Atlas (cloud MongoDB), use the connection string from Atlas.  
 > If you're using Azure Cosmos DB with MongoDB API, use the connection string from Cosmos DB.
 
-### Step 6: Test the Deployment
+### Step 6: Create and Run the Pipeline
 
-#### Option A: Manual Trigger
+#### Option A: Create Pipeline from YAML File
 
-1. Go to your GitHub repository
-2. Click **Actions** tab
-3. Select **"Build and Deploy to Azure App Service"** workflow
-4. Click **"Run workflow"** button (right side)
-5. Select branch (usually `main` or `master`)
-6. Click **"Run workflow"**
+1. **Go to Azure DevOps:**
+   - Navigate to your project: `https://dev.azure.com/YOUR_ORG/YOUR_PROJECT`
 
-#### Option B: Push to Main Branch
+2. **Open Pipelines:**
+   - Click **"Pipelines"** in the left sidebar
+   - Click **"Pipelines"** (under Pipelines section)
 
-Simply push your code to the `main` or `master` branch:
+3. **Create New Pipeline:**
+   - Click **"New pipeline"** button
+   - Select **"Azure Repos Git"** (or your repository source)
+   - Select your repository
+   - Select **"Existing Azure Pipelines YAML file"**
+   - Choose branch: `main` or `master`
+   - Choose path: `/azure-pipelines.yml`
+   - Click **"Continue"**
+
+4. **Review and Run:**
+   - Review the pipeline configuration
+   - Click **"Run"** to start the first build
+
+#### Option B: Push to Main Branch (Auto-trigger)
+
+Once the pipeline is created, it will automatically trigger on pushes to `main` or `master`:
 
 ```powershell
 git add .
-git commit -m "Setup deployment workflow"
+git commit -m "Setup deployment pipeline"
 git push origin main
 ```
 
-The workflow will automatically trigger.
-
 ### Step 7: Monitor Deployment
 
-1. Go to **Actions** tab in GitHub
-2. Click on the running workflow
-3. Watch the build and deployment progress
-4. Green checkmark = Success ✅
-5. Red X = Failure ❌ (click to see error details)
+1. **Go to Pipelines in Azure DevOps:**
+   - Click **"Pipelines"** → **"Pipelines"** in left sidebar
+
+2. **View Pipeline Runs:**
+   - Click on your pipeline name
+   - You'll see all pipeline runs
+
+3. **Monitor Progress:**
+   - Click on a running pipeline to see real-time logs
+   - Green checkmark = Success ✅
+   - Red X = Failure ❌ (click to see error details)
+
+4. **View Logs:**
+   - Click on any stage (Build or Deploy) to see detailed logs
+   - Expand individual tasks to see step-by-step output
 
 ### Step 8: Verify Your App
 
@@ -201,10 +223,12 @@ The workflow will automatically trigger.
 
 ### Deployment Fails
 
-1. **Check App Service name**: Ensure it matches in workflow file
-2. **Check publish profile secret**: Verify it's correctly added in GitHub
-3. **Check build errors**: Look at the "Build" step logs in GitHub Actions
-4. **Check .NET version**: Ensure your project uses .NET 8.0
+1. **Check App Service name**: Ensure it matches in `azure-pipelines.yml` (variable `appName`)
+2. **Check service connection**: Verify the service connection name matches in pipeline file
+3. **Check service connection permissions**: Ensure it has access to your App Service
+4. **Check build errors**: Look at the "Build" stage logs in Azure Pipelines
+5. **Check .NET version**: Ensure your project uses .NET 8.0
+6. **Check Azure subscription**: Verify the service connection is linked to the correct subscription
 
 ### App Doesn't Work After Deployment
 
