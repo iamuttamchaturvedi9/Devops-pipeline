@@ -8,7 +8,7 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  azureSubscription: 'sn-microservices-qas'  # Update this with your Azure service connection name
+  azureSubscription: 'scn-micoservices-qas'  # Update this with your Azure service connection name
   appName: 'app-microservices-qas'  # Update this with your App Service name
   dotnetVersion: '8.0.x'
   projectPath: 'Shopping.API/Shopping.API.csproj'
