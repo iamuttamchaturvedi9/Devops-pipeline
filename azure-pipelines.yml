@@ -9,7 +9,7 @@ pool:
 
 variables:
   azureSubscription: 'scn-micoservices-qas'
-  appName: 'app-microservices-qas'
+  appName: 'app-shoppingmicroservices-qas'
   dotnetVersion: '8.0.x'
   projectPath: 'Shopping.API/Shopping.API.csproj'
 
