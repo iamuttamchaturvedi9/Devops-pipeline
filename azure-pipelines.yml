@@ -8,8 +8,8 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  azureSubscription: 'scn-micoservices-qas'  # Update this with your Azure service connection name
-  appName: 'app-microservices-qas'  # Update this with your App Service name
+  azureSubscription: 'scn-micoservices-qas'
+  appName: 'app-microservices-qas'
   dotnetVersion: '8.0.x'
   projectPath: 'Shopping.API/Shopping.API.csproj'
 
@@ -29,28 +29,19 @@ stages:
         version: $(dotnetVersion)
 
     - task: DotNetCoreCLI@2
-      displayName: 'Restore solution'
+      displayName: 'Restore dependencies'
       inputs:
         command: 'restore'
         projects: '**/*.sln'
 
     - task: DotNetCoreCLI@2
-      displayName: 'Publish Shopping.API'
+      displayName: 'Publish application'
       inputs:
         command: 'publish'
         projects: '$(projectPath)'
         arguments: '--configuration Release --output $(Build.ArtifactStagingDirectory) --no-restore'
-
-    - task: Bash@3
-      displayName: 'List published files'
-      inputs:
-        targetType: 'inline'
-        script: |
-          echo "Files in artifact staging directory:"
-          ls -la $(Build.ArtifactStagingDirectory)
-          echo ""
-          echo "Looking for Shopping.API.dll:"
-          find $(Build.ArtifactStagingDirectory) -name "Shopping.API.dll" -type f
+        publishWebProjects: false
+        zipAfterPublish: false
 
     - task: ArchiveFiles@2
       displayName: 'Create deployment package'
@@ -58,68 +49,44 @@ stages:
         rootFolderOrFile: '$(Build.ArtifactStagingDirectory)'
         includeRootFolder: false
         archiveType: 'zip'
-        archiveFile: '$(Build.ArtifactStagingDirectory)/deployment.zip'
+        archiveFile: '$(Build.ArtifactStagingDirectory)/deploy.zip'
         replaceExistingArchive: true
 
     - task: PublishBuildArtifacts@1
-      displayName: 'Publish artifacts'
+      displayName: 'Publish artifact'
       inputs:
-        pathToPublish: '$(Build.ArtifactStagingDirectory)/deployment.zip'
+        pathToPublish: '$(Build.ArtifactStagingDirectory)/deploy.zip'
         artifactName: 'drop'
 
 - stage: Deploy
-  displayName: 'Deploy to Azure App Service'
+  displayName: 'Deploy to Azure'
   dependsOn: Build
   condition: succeeded()
   jobs:
   - deployment: DeployJob
     displayName: 'Deploy to App Service'
-    environment: 'Production'  # You can create environments in Azure DevOps
+    environment: 'Production'
     strategy:
       runOnce:
         deploy:
           steps:
-          - task: AzureCLI@2
-            displayName: 'Configure App Service Runtime Stack'
-            inputs:
-              azureSubscription: '$(azureSubscription)'
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                echo "Configuring App Service runtime stack..."
-                RG=$(az webapp show --name $(appName) --query resourceGroup -o tsv)
-                echo "Resource Group: $RG"
-                az webapp config set --name $(appName) --resource-group $RG --linux-fx-version "DOTNETCORE|8.0"
-                az webapp config set --name $(appName) --resource-group $RG --startup-file "dotnet Shopping.API.dll"
-                echo "Runtime stack configured successfully"
-
-          - task: Bash@3
-            displayName: 'Extract and verify deployment package'
-            inputs:
-              targetType: 'inline'
-              script: |
-                echo "Contents of drop folder:"
-                ls -la $(Pipeline.Workspace)/drop
-                echo ""
-                if [ -f "$(Pipeline.Workspace)/drop/deployment.zip" ]; then
-                  echo "Found deployment.zip, extracting..."
-                  unzip -q $(Pipeline.Workspace)/drop/deployment.zip -d $(Pipeline.Workspace)/drop/extracted
-                  echo "Extracted files:"
-                  ls -la $(Pipeline.Workspace)/drop/extracted
-                  echo ""
-                  echo "Looking for Shopping.API.dll:"
-                  find $(Pipeline.Workspace)/drop/extracted -name "Shopping.API.dll" -type f || echo "Shopping.API.dll not found!"
-                else
-                  echo "No deployment.zip found, checking for direct files..."
-                  find $(Pipeline.Workspace)/drop -name "Shopping.API.dll" -type f || echo "Shopping.API.dll not found!"
-                fi
-
           - task: AzureWebApp@1
             displayName: 'Deploy to Azure App Service'
             inputs:
               azureSubscription: '$(azureSubscription)'
               appName: '$(appName)'
-              package: '$(Pipeline.Workspace)/drop/deployment.zip'
-              deploymentMethod: 'auto'
-              startUpCommand: 'dotnet Shopping.API.dll'
+              package: '$(Pipeline.Workspace)/drop/deploy.zip'
+              deploymentMethod: 'zipDeploy'
 
+          - task: AzureCLI@2
+            displayName: 'Configure and restart'
+            inputs:
+              azureSubscription: '$(azureSubscription)'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                RG=$(az webapp show --name $(appName) --query resourceGroup -o tsv)
+                az webapp config set --name $(appName) --resource-group $RG --linux-fx-version "DOTNETCORE|8.0"
+                az webapp config set --name $(appName) --resource-group $RG --startup-file "dotnet Shopping.API.dll"
+                az webapp restart --resource-group $RG --name $(appName)
+                echo "✅ Deployment complete"
