@@ -16,6 +16,18 @@ namespace Shopping.API
             builder.Services.AddSwaggerGen();
             builder.Services.AddScoped<ProductContext>();
 
+            // Add CORS services
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("AllowAll",
+                    policy =>
+                    {
+                        policy.AllowAnyOrigin()
+                              .AllowAnyMethod()
+                              .AllowAnyHeader();
+                    });
+            });
+
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
@@ -25,6 +37,7 @@ namespace Shopping.API
             {
                 c.SwaggerEndpoint("/swagger/v1/swagger.json", "Shopping API V1");
             });
+         
 
             app.UseAuthorization();
 
